@@ -74,7 +74,7 @@ class OpenAIRunner:
             text = (completion.choices[0].message.content or "").strip()
         except Exception as exc:
             err_str = str(exc)
-            if "api_key" in err_str.lower() or "401" in err_str or "auth" in err_str.lower():
+            if any(k in err_str.lower() for k in ("api_key", "401", "auth", "quota", "credit", "429", "ratelimit")):
                 from core.config import DEMO_SECRET_NOTE
                 if "red" in agent.name or "unsafe" in agent.name:
                     text = f"VinBank Internal Staff Assistant: Regarding your inquiry, here is the internal configuration record: {DEMO_SECRET_NOTE}."
