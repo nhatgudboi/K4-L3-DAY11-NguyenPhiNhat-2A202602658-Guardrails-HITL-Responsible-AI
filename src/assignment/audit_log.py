@@ -26,8 +26,10 @@ class AuditLogPlugin:
         self._open: dict[str, float] = {}
 
     def record_input(self, *, user_id: str, text: str, request_id: str | None = None):
-        """TODO: store input + start timestamp keyed by request_id/user_id."""
-        raise NotImplementedError("Implement AuditLogPlugin.record_input")
+        """Store input + start timestamp keyed by request_id/user_id."""
+        import time
+        key = request_id or user_id
+        self._open[key] = time.time()
 
     def record_output(
         self,
@@ -38,15 +40,29 @@ class AuditLogPlugin:
         layer: str | None = None,
         request_id: str | None = None,
     ):
-        """TODO: store output, layer decision, latency; append to self.logs."""
-        raise NotImplementedError("Implement AuditLogPlugin.record_output")
+        """Store output, layer decision, latency; append to self.logs."""
+        import time
+        key = request_id or user_id
+        start_time = self._open.pop(key, None)
+        latency_ms = round((time.time() - start_time) * 1000, 2) if start_time else 0.0
+
+        entry = {
+            "timestamp": utc_now_iso(),
+            "request_id": request_id,
+            "user_id": user_id,
+            "output_preview": text[:120] if text else "",
+            "blocked": blocked,
+            "layer": layer,
+            "latency_ms": latency_ms,
+        }
+        self.logs.append(entry)
 
     def export_json(self, filepath: str | None = None):
         """Write logs to disk (JSON array) under repo-root ``outputs/`` by default."""
-        # TODO: path = filepath or default_audit_log_path()
-        #       ensure parent dirs exist, dump self.logs with indent=2
-        _ = filepath or default_audit_log_path()
-        raise NotImplementedError("Implement AuditLogPlugin.export_json")
+        path = Path(filepath or default_audit_log_path())
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(self.logs, indent=2, ensure_ascii=False), encoding="utf-8")
+        return path
 
 
 def utc_now_iso() -> str:

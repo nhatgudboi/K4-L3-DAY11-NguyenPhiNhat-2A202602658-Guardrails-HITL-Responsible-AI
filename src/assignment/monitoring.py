@@ -42,16 +42,53 @@ class MonitoringAlert:
     judge_fails: int = 0
 
     def check_metrics(self) -> list[Alert]:
-        """TODO: compute rates, append Alert objects when thresholds exceeded."""
-        raise NotImplementedError("Implement MonitoringAlert.check_metrics")
+        """Compute rates, append Alert objects when thresholds exceeded."""
+        new_alerts = []
+        block_rate = (
+            self.blocked_requests / self.total_requests
+            if self.total_requests
+            else 0.0
+        )
+        if block_rate >= self.block_rate_threshold:
+            new_alerts.append(
+                Alert(
+                    metric="block_rate",
+                    value=round(block_rate, 4),
+                    threshold=self.block_rate_threshold,
+                    message=f"Block rate {block_rate:.2%} exceeded threshold {self.block_rate_threshold:.2%}",
+                )
+            )
+        if self.rate_limit_hits >= self.rate_limit_hit_threshold:
+            new_alerts.append(
+                Alert(
+                    metric="rate_limit_hits",
+                    value=float(self.rate_limit_hits),
+                    threshold=float(self.rate_limit_hit_threshold),
+                    message=f"Rate limit hits {self.rate_limit_hits} reached threshold {self.rate_limit_hit_threshold}",
+                )
+            )
+        judge_fail_rate = (
+            self.judge_fails / self.judge_checks if self.judge_checks else 0.0
+        )
+        if self.judge_checks > 0 and judge_fail_rate >= self.judge_fail_rate_threshold:
+            new_alerts.append(
+                Alert(
+                    metric="judge_fail_rate",
+                    value=round(judge_fail_rate, 4),
+                    threshold=self.judge_fail_rate_threshold,
+                    message=f"Judge fail rate {judge_fail_rate:.2%} exceeded threshold {self.judge_fail_rate_threshold:.2%}",
+                )
+            )
+        self.alerts = new_alerts
+        return self.alerts
 
     def export_json(self, filepath: str | None = None):
-        """TODO: write metrics + alerts to JSON under repo-root ``outputs/`` by default.
-        Use ``filepath or default_metrics_path()`` so running from ``src/`` does not
-        create ``src/outputs/``.
-        """
-        _ = filepath or default_metrics_path()
-        raise NotImplementedError("Implement MonitoringAlert.export_json")
+        """Write metrics + alerts to JSON under repo-root ``outputs/`` by default."""
+        path = Path(filepath or default_metrics_path())
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self.check_metrics()
+        path.write_text(json.dumps(self.snapshot(), indent=2), encoding="utf-8")
+        return path
 
     def snapshot(self) -> dict:
         block_rate = (
